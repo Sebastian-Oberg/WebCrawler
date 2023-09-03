@@ -1,0 +1,63 @@
+1. WSAStartup()
+2. Socket initialization via socket()
+3. DNS conversion via inet_addr()
+4. DNS lookup via gethostbyname()
+5. Connection
+	- If the URL passes basic checks (i.e., correct scheme, non-zero port number), you should attempt to obtain the page via HTTP 1.0.
+6. Here is where you make a GET request, send, rcv() loop, and parse
+	- If you manage to connect and receive a valid reply (HTTP 2xx), parse the HTML result and display the required information about your download
+	- Otherwise, the program should legibly report the type of error encountered and terminate gracefully, even if the remote host is hanging or not responding
+	- Note that your code must be able to handle pages of arbitrary length by dynamically expanding the buffer provided to recv()
+7. Cleanup
+*Note: place steps 2-7 within the Socket object to make part 3 easier
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+Supported Format
+	scheme://host[:port][/path][?query][#fragment]
+
+Strip off the fragment and extract the port number from the host
+	- If the path is not present, must use root “/” in its place
+
+How to do:
+1) Find # using strchr() and truncate
+2) Find ? , extract query, truncate
+3) Find / , extract path, truncate
+4) Find :, extract port, truncate, obtain host
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+Must accept a single command - line argument with a target URL
+	- If the argument is missing or there are too many of them, print usage information and quit
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+HTML Parsing Notes:
+One-tab indentation after the first line, an asterisk for the connection phase, a plus for the parsing phase, and timing of each networking step are required
+	- If you manage to receive the page, but the status code is not 2xx, skip the HTML parser, but print everything else
+	- If you are unable to download the page, stop at the last attempted step and display the failure condition
+		- For network errors, provide the corresponding WSAGetLastError() result
+
+
+
+    // Replace Missing Path
+    char* pathStart = strchr(url + 7, '/');
+    if (pathStart == nullptr) {
+        pathStart = url + strlen(url);
+        url = new char[pathStart - url + 2];
+        strncpy_s(url, pathStart - url + 2, argv[1], pathStart - argv[1] + 1);
+        url[pathStart - argv[1] + 1] = '/';
+        url[pathStart - argv[1] + 2] = '\0';
+    }
+
+    // Rest of your code for parsing components and performing checks...
+    
+    delete[] url;
+    return 0;
+}
+
+//Find where header is, then parse (only parse body)
+//use curpause for recv function (HTML Parsing)
+
+User wants url
+parse url for get request
+take hosr and do dns lookup (winsock.cpp)
+allows you to call connect with ip
+from there format get request
+send
+select waits on socket descripters (like wait) then after its raised (data or error) you call recieved
+if correct, you get back response
