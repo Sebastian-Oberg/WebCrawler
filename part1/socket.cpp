@@ -97,67 +97,112 @@ bool Socket::Read(void) {
 }
 
 
-char* Socket::dns(char str[], char* portPos) {
-	// string pointing to an HTTP server (DNS name or IP)
-	/*char str[] = "www.tamu.edu";*/
-	//We get -> char str [] = "128.194.135.72";
+char* Socket::dns(char str[], char* portPos, set<string>& ipSet) {
     clock_t startConnect;
     clock_t finishConnect;
     clock_t startDNS;
     clock_t finishDNS;
+    clock_t startRobots;
+    clock_t finishRobots;
 
     startDNS = clock();
     sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-	// structure used in DNS lookups
-	struct hostent* remote;
+    // structure used in DNS lookups
+    struct hostent* remote;
 
-	// structure for connecting to server
-	struct sockaddr_in server;
+    // structure for connecting to server
+    struct sockaddr_in server;
     memset(&server, 0, sizeof(server)); // Fill with zeros
 
-	// first assume that the string is an IP address
-	DWORD IP = inet_addr(str);
+    // first assume that the string is an IP address
+    DWORD IP = inet_addr(str);
 
-	if (IP == INADDR_NONE)
-	{
-		// if not a valid IP, then do a DNS lookup
-		if ((remote = gethostbyname(str)) == NULL)
-		{
+    if (IP == INADDR_NONE)
+    {
+        // if not a valid IP, then do a DNS lookup
+        if ((remote = gethostbyname(str)) == NULL)
+        {
             printf("\tDoing DNS... failed with %d\n", WSAGetLastError());
-			return nullptr;
-		}
-		else // take the first IP address and copy into sin_addr
-		{
-			memcpy((char*)&(server.sin_addr), remote->h_addr, remote->h_length);
-		}
-	}
-
-	else
-	{
-		// if a valid IP, directly drop its binary version into sin_addr
-		server.sin_addr.S_un.S_addr = IP;
-	}
+            return nullptr;
+        }
+        else // take the first IP address and copy into sin_addr
+        {
+            memcpy((char*)&(server.sin_addr), remote->h_addr, remote->h_length);
+        }
+    }
+    else
+    {
+        // if a valid IP, directly drop its binary version into sin_addr
+        server.sin_addr.S_un.S_addr = IP;
+    }
 
     finishDNS = clock();
     printf("\tDoing DNS... done in %d ms, found %s\n", (finishDNS - startDNS), inet_ntoa(server.sin_addr));
 
-	// setup the port # and protocol type
-	server.sin_family = AF_INET;
+    string resolvedIP = inet_ntoa(server.sin_addr);
 
-    startConnect = clock();
+    auto result = ipSet.insert(resolvedIP);
+    if (!result.second)
+    {
+        printf("\tIP %s is not unique.\n", resolvedIP.c_str());
+        closesocket(sock); // Close the socket since we won't be connecting
+        return nullptr;
+    }
+
+    printf("        Checking IP uniqueness... passed\n");
+
+    // setup the port # and protocol type
     server.sin_family = AF_INET;
     server.sin_port = htons(atoi(portPos));
 
-	// connect to the server on port 80
-	if (connect(sock, (struct sockaddr*)&server, sizeof(struct sockaddr_in)) == SOCKET_ERROR)
-	{
+    startConnect = clock();
+
+    // connect to the server on port 80
+    if (connect(sock, (struct sockaddr*)&server, sizeof(struct sockaddr_in)) == SOCKET_ERROR)
+    {
         printf("      * Connecting on page... failed with %d\n", WSAGetLastError());
-		return nullptr;
-	}
+        return nullptr;
+    }
 
     finishConnect = clock();
     printf("      * Connecting on page... done in %d ms\n", finishConnect - startConnect);
+
+    // Construct HTTP GET request for robots.txt
+    string getRequest = "GET /robots.txt HTTP/1.0\r\nHost: ";
+    getRequest += str;  // Add the host name
+    getRequest += "\r\n\r\n";
+
+    // Start the timer for fetching robots.txt
+    startRobots = clock();
+
+    // Send HTTP GET request
+    if (Send(getRequest.c_str(), getRequest.size()))
+    {
+        // Read HTTP response
+        if (Read())
+        {
+            // Stop the timer after reading the response
+            finishRobots = clock();
+
+            // Calculate the time taken to fetch robots.txt
+            int timeTakenRobots = static_cast<int>((finishRobots - startRobots) * 1000.0 / CLOCKS_PER_SEC);
+
+            // Print the time taken
+            printf("        Connecting on robots... done in %d ms\n", timeTakenRobots);
+
+            // Check HTTP status code
+            int statusCode = getStatusCode();
+            if (statusCode == 200)
+            {
+                printf("Robots.txt exists for %s\n", str);
+            }
+            else
+            {
+                printf("        Robots.txt does not exist for %s, HTTP Status Code: %d\n", str, statusCode);
+            }
+        }
+    }
 
     // At the end, before returning, return the IP as a string
     return inet_ntoa(server.sin_addr);

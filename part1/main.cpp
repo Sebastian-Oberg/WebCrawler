@@ -112,7 +112,7 @@ int main(int argc, char** argv)
     url currentURL;
     set<char*, CharStarComparator> hostSet;
 
-    while (!urlQueue.empty())
+    while (!urlQueue.empty()) 
     {
         char* curURL = urlQueue.front();
         printf("URL: %s\n", curURL);
@@ -120,58 +120,15 @@ int main(int argc, char** argv)
         currentURL.parseURL(curURL);
 
         // Check if host is unique using a set
-        auto result = hostSet.insert(currentURL.host);
+        auto hostResult = hostSet.insert(currentURL.host);
 
-        if (result.second)
+        if (hostResult.second) 
         {
             printf("        Checking host uniqueness... passed\n");
-            
-            // DNS lookup
-            char* ipAddr = mySocket.dns(currentURL.host, currentURL.portPos);
-
-            // Check if the IP is unique using the set (similar to your check for hosts)
-            auto result = ipSet.insert(ipAddr);
-
-            if (result.second)  // If IP is unique
-            {
-                printf("        Checking IP uniqueness... passed\n");
-                // Construct HTTP GET request for robots.txt
-                string getRequest = "GET /robots.txt HTTP/1.0\r\nHost: ";
-                getRequest += currentURL.host;  // Add the host name
-                getRequest += "\r\n\r\n";
-
-                // Start the timer
-                clock_t start = clock();
-
-                // Send HTTP GET request
-                if (mySocket.Send(getRequest.c_str(), getRequest.size()))
-                {
-                    // Read HTTP response
-                    if (mySocket.Read())
-                    {
-                        // End the timer
-                        clock_t end = clock();
-
-                        // Calculate time taken and print
-                        double timeTaken = static_cast<double>(end - start) / CLOCKS_PER_SEC * 1000;  // Convert to milliseconds
-                        printf("        Connecting on robots... done in %.0f ms\n", timeTaken);
-
-                        // Check HTTP status code
-                        int statusCode = mySocket.getStatusCode();
-                        if (statusCode == 200)
-                        {
-                            printf("Robots.txt exists for %s\n", currentURL.host);
-                        }
-                        else
-                        {
-                            printf("Robots.txt does not exist for %s, HTTP Status Code: %d\n", currentURL.host, statusCode);
-                        }
-                    }
-                }
-            }
+            char* ipAddr = mySocket.dns(currentURL.host, currentURL.portPos, ipSet);
         }
 
-        else
+        else 
         {
             printf("        Checking host uniqueness... failed\n");
         }
