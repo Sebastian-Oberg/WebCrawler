@@ -11,21 +11,21 @@ using namespace std;
 //Initialize WinSock; once per program run
 void winsock_test(void)
 {
-	WSADATA wsaData;
-	WORD wVersionRequested = MAKEWORD(2, 2);
+    WSADATA wsaData;
+    WORD wVersionRequested = MAKEWORD(2, 2);
 
-	if (WSAStartup(wVersionRequested, &wsaData) != 0) 
+    if (WSAStartup(wVersionRequested, &wsaData) != 0)
     {
-		printf("WSAStartup error %d\n", WSAGetLastError());
-		WSACleanup();
-		return;
-	}
+        printf("WSAStartup error %d\n", WSAGetLastError());
+        WSACleanup();
+        return;
+    }
 }
 
 // Used to compare char* values when inserting in a set
-struct CharStarComparator 
+struct CharStarComparator
 {
-    bool operator() (const char* lhs, const char* rhs) const 
+    bool operator() (const char* lhs, const char* rhs) const
     {
         return strcmp(lhs, rhs) < 0;
     }
@@ -112,23 +112,26 @@ int main(int argc, char** argv)
     url currentURL;
     set<char*, CharStarComparator> hostSet;
 
-    while (!urlQueue.empty()) 
+    while (!urlQueue.empty())
     {
         char* curURL = urlQueue.front();
         printf("URL: %s\n", curURL);
 
-        currentURL.parseURL(curURL);
+        if (currentURL.parseURL(curURL)) // If scheme is invalid then return
+        {
+            return 1;
+        }
 
         // Check if host is unique using a set
         auto hostResult = hostSet.insert(currentURL.host);
 
-        if (hostResult.second) 
+        if (hostResult.second)
         {
             printf("        Checking host uniqueness... passed\n");
             char* ipAddr = mySocket.dns(currentURL.host, currentURL.portPos, ipSet);
         }
 
-        else 
+        else
         {
             printf("        Checking host uniqueness... failed\n");
         }

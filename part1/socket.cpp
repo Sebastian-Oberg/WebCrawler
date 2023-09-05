@@ -21,7 +21,7 @@ bool Socket::Read(void) {
 
     fd_set fd; // Declare a file descriptor
     int ret;
-    clock_t start = clock();
+    start = clock();
 
     while (true)
     {
@@ -53,8 +53,7 @@ bool Socket::Read(void) {
             if (bytes == 0)
             {
                 buf[curPos] = '\0'; // NULL-terminate buffer
-                clock_t finish = clock();
-                printf("\tLoading... done in %d ms with %d bytes\n", (finish - start), curPos);
+                finish = clock();
                 return true;
             }
 
@@ -166,7 +165,6 @@ char* Socket::dns(char str[], char* portPos, set<string>& ipSet) {
     }
 
     finishConnect = clock();
-    printf("      * Connecting on page... done in %d ms\n", finishConnect - startConnect);
 
     // Construct HTTP GET request for robots.txt
     string getRequest = "GET /robots.txt HTTP/1.0\r\nHost: ";
@@ -190,19 +188,22 @@ char* Socket::dns(char str[], char* portPos, set<string>& ipSet) {
 
             // Print the time taken
             printf("        Connecting on robots... done in %d ms\n", timeTakenRobots);
+            printf("\tLoading... done in %d ms with %d bytes\n", (finish - start), curPos);
 
             // Check HTTP status code
             int statusCode = getStatusCode();
             if (statusCode == 200)
             {
-                printf("Robots.txt exists for %s\n", str);
+               /* printf("        Robots.txt exists for %s\n", str);*/
             }
             else
             {
-                printf("        Robots.txt does not exist for %s, HTTP Status Code: %d\n", str, statusCode);
+                /*printf("        Robots.txt does not exist for %s, HTTP Status Code: %d\n", str, statusCode);*/
             }
         }
     }
+
+    printf("      * Connecting on page... done in %d ms\n", finishConnect - startConnect);
 
     // At the end, before returning, return the IP as a string
     return inet_ntoa(server.sin_addr);

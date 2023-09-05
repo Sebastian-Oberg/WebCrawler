@@ -1,3 +1,7 @@
-http://www.google.com/
-http://www.wikipedia.org/
-http://www.twitter.com/
+http://www.bing.com/
+http://www.reddit.com/
+http://www.apple.com/
+http://www.adobe.com/
+http://www.yahoo.com/
+http://www.msn.com/
+http://www.aol.com/

@@ -16,6 +16,9 @@ public:
     HTMLParserBase* parser;
     bool validConnection = false;
 
+    clock_t start = 0;
+    clock_t finish = 0;
+
     Socket();
     ~Socket();
     bool Read();

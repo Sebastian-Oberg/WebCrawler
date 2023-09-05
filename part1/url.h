@@ -21,5 +21,5 @@ public:
     url();
     ~url();
     char* truncate(char* str, char c);
-    int parseURL(char* url);
+    int parseURL(char* inputURL);
 };
