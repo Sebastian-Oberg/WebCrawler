@@ -34,30 +34,106 @@ One-tab indentation after the first line, an asterisk for the connection phase, 
 
 
 
-    // Replace Missing Path
-    char* pathStart = strchr(url + 7, '/');
-    if (pathStart == nullptr) {
-        pathStart = url + strlen(url);
-        url = new char[pathStart - url + 2];
-        strncpy_s(url, pathStart - url + 2, argv[1], pathStart - argv[1] + 1);
-        url[pathStart - argv[1] + 1] = '/';
-        url[pathStart - argv[1] + 2] = '\0';
+    
+
+    // Step 3: Socket Initialization and Connection
+    winsock_test();
+
+    // Create socket
+    Socket mySocket;
+    mySocket.openSocket(); // Error handling is included in method
+
+
+    /*
+         Step 4: DNS (Clock this!)
+            Perform DNS lookup - translates human readable domain names (for example, www.amazon.com) to machine readable IP
+            Handle cases where the DNS lookup fails
+            - 1. Connect but not valid reply
+            - 2. Cannot connect
+    */
+
+    mySocket.dns(host, portPos); // Calls connect
+
+    // Step 5: HTTP Request Construction
+ 
+    // Construct the HTTP request
+    char request[2048];
+    sprintf_s(request, "GET %s%s HTTP/1.0\r\nHost: %s\r\n\r\n", path, (query != nullptr) ? query : "", host);
+
+    // Step 6: Sending and Receiving Data
+
+    // Send the request
+    if (!mySocket.Send(request, static_cast<int>(strlen(request))))
+    {
+        printf("Failed to send request.\n");
+        return 1;
     }
 
-    // Rest of your code for parsing components and performing checks...
-    
-    delete[] url;
+    // Receive and process data in a loop
+    if (!mySocket.Read())
+    {
+        printf("Failed to receive response.\n");
+        return 1;
+    }
+
+    //Step 7: Parsing HTTP Response
+    bool fullHTMLParse = false;
+    int statusCode = mySocket.getStatusCode(); // Extract status code
+
+    // Status code is null
+    if (statusCode < 0)
+    {
+        printf("ERROR: Buffer is equal to NULL\n");
+        return -1;
+    }
+
+    // Status code is invalid
+    if (statusCode < 100 || statusCode > 599)
+    {
+        printf("ERROR: Invalid status code %i\n", statusCode);
+        return -1;
+    }
+
+    // Positive Status Codes
+    printf("\tVerifying header... status code %i\n", statusCode);
+
+    // Range where we want to parse
+    if ((statusCode >= 200) && (statusCode < 300))
+    {
+        fullHTMLParse = true;
+    }
+
+    // Step 8: Displaying Results
+
+    // Range where we want to skip the HTML parser, but print everything else
+    if (mySocket.validConnection && fullHTMLParse)
+    {
+        // Call html parser
+        char* position = strstr(mySocket.buf, "\r\n\r\n");
+        mySocket.parse(position, mySocket.curPos - atoi(position + 4), originalURL, strlen(originalURL));
+
+        printf("----------------------------------------\n");
+
+        // Print truncated html
+        char* truncated = truncate(mySocket.buf, '<');
+        printf(truncated);
+    }
+
+    else if (mySocket.validConnection && !fullHTMLParse)
+    {
+        printf("----------------------------------------\n");
+        char* truncated = truncate(mySocket.buf, '<');
+        printf(truncated);
+    }
+
+    else
+    {
+        printf("\tConnection Error: %d\n", WSAGetLastError());
+        printf("----------------------------------------\n");
+    }
+
+    // Step 10: Cleanup and Finalization
+    mySocket.Close();
+    mySocket.End();
+
     return 0;
-}
-
-//Find where header is, then parse (only parse body)
-//use curpause for recv function (HTML Parsing)
-
-User wants url
-parse url for get request
-take hosr and do dns lookup (winsock.cpp)
-allows you to call connect with ip
-from there format get request
-send
-select waits on socket descripters (like wait) then after its raised (data or error) you call recieved
-if correct, you get back response

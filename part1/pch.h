@@ -18,6 +18,9 @@
 #include <iostream>
 #include <string.h>
 #include <ctime>
+#include <queue>
+#include <set>
+#include <vector>
 using namespace std;
 
 #endif //PCH_H

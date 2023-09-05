@@ -97,7 +97,7 @@ bool Socket::Read(void) {
 }
 
 
-void Socket::dns(char str[], char* portPos) {
+char* Socket::dns(char str[], char* portPos) {
 	// string pointing to an HTTP server (DNS name or IP)
 	/*char str[] = "www.tamu.edu";*/
 	//We get -> char str [] = "128.194.135.72";
@@ -125,7 +125,7 @@ void Socket::dns(char str[], char* portPos) {
 		if ((remote = gethostbyname(str)) == NULL)
 		{
             printf("\tDoing DNS... failed with %d\n", WSAGetLastError());
-			return;
+			return nullptr;
 		}
 		else // take the first IP address and copy into sin_addr
 		{
@@ -153,11 +153,14 @@ void Socket::dns(char str[], char* portPos) {
 	if (connect(sock, (struct sockaddr*)&server, sizeof(struct sockaddr_in)) == SOCKET_ERROR)
 	{
         printf("      * Connecting on page... failed with %d\n", WSAGetLastError());
-		return;
+		return nullptr;
 	}
 
     finishConnect = clock();
     printf("      * Connecting on page... done in %d ms\n", finishConnect - startConnect);
+
+    // At the end, before returning, return the IP as a string
+    return inet_ntoa(server.sin_addr);
 }
 
 void Socket::openSocket() {
@@ -242,14 +245,13 @@ int Socket::getStatusCode()
     return statusCode;
 }
 
-
 int Socket::parse(char* html, int htmlSize, char* baseURL, int baseURLSize)
 {
     clock_t start = clock();
     char* baseUrl = baseURL;		// where this page came from; needed for construction of relative links
     int nLinks;
     char* linkBuffer = parser->Parse(html, htmlSize, baseURL, (int)strlen(baseURL), &nLinks);
-    /*printf("Testing...%d\n",nLinks);*/
+
     // check for errors indicated by negative values
     if (nLinks < 0)
     {

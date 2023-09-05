@@ -1,2 +1,39 @@
+# Exclude debug and release directories
+x64/Debug/
+x64/Release/
+part1/x64/Debug/
+part1/x64/Release/
+
+# Exclude user-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Intermediate files
+*.log
+*.tlog
+*.pdb
+*.ilk
+*.obj
+*.exe
+*.iobj
+*.ipdb
+*.dll
+*.dylib
+*.exp
+*.lib
+
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+# Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+# VS Code directories
+.vscode/
+
+# Visual Studio cache directory
 .vs/
-*.opendb

@@ -137,11 +137,13 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="socket.cpp" />
+    <ClCompile Include="url.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\HTMLParserTest\HTMLParserTest\HTMLParserBase.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="socket.h" />
+    <ClInclude Include="url.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="Notes.txt" />

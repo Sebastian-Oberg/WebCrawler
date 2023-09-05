@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "socket.h"
+#include "url.h"
 #include "HTMLParserBase.h"
 #pragma comment(lib, "ws2_32.lib")
 using namespace std;
@@ -21,281 +22,161 @@ void winsock_test(void)
 	}
 }
 
-char* truncate(char* str, char c)
+// Used to compare char* values when inserting in a set
+struct CharStarComparator 
 {
-    char* index = strchr(str, c); // Get position where c is at in str
-    size_t length = index - str; // Calculate length of truncated piece
-    char* truncated = new char[length + 1]; // Allocate memory for truncated string
-    strncpy_s(truncated, length + 1, str, length); // Copy truncated part into new buffer
-    truncated[length] = '\0'; // Null-terminate new string
-    return truncated;
-}
+    bool operator() (const char* lhs, const char* rhs) const 
+    {
+        return strcmp(lhs, rhs) < 0;
+    }
+};
 
 int main(int argc, char** argv)
 {
-
-    /*
-        Step 1: Get URL and validate
-    */
-    char* url = argv[1]; // Get URL
-    char* originalURL = argv[1];
-    printf("URL: %s\n", url);
-
+    // Step 0: Allow the code to take in two arguments: numThreads and URL
     // Check Command - Line Arguments
-    if (argc != 2)
+    if (argc != 3)
     {
-        printf("\n Incorrect Number of Arguments Passed In: %d", argc);
+        printf("\nIncorrect Number of Arguments Passed In: %d\n", argc - 1);
         return 1;
     }
 
-    if (strlen(url) > MAX_URL_LEN || strlen(url) > MAX_REQUEST_LEN)
-    {
-        printf("ERROR: Length of string violates max host length: %d or max length: %d", MAX_HOST_LEN, MAX_REQUEST_LEN);
-        return -1;
-    }
+    int numThreads = atoi(argv[1]);
 
-    /*
-         Step 2: URL Parsing
-            Extract URL components + validate the extracted components
-            - Scheme can only be http
-            - If the path is not present, must use root “/” in its place
-            - Non zero port if there is one
-    */
-
-    // Check Scheme
-    if (strncmp(url, "http://", 7) != 0) 
+    if (numThreads != 1)
     {
-        printf("\tParsing URL... failed with invalid scheme\n");
+        printf("Incorrect number of threads: %i. Only 1 is accepted!\n", numThreads);
         return 1;
     }
 
-    else
+    char* filename = argv[2];
+
+    HANDLE hFile = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+    if (hFile == INVALID_HANDLE_VALUE)
     {
-        url += 7; // Contiguous, so this "removes" the scheme from the url
-    }
-  
-    // 1a. Find #, extract fragment, truncate
-    char* fragment = strchr(url, '#');
-    bool fragmentIsNull = false;
-     
-    // Throw error if fragment not found
-    if (fragment == nullptr)
-    {
-        fragmentIsNull = true;
-        fragment = new char[1];
-        fragment[0] = '\0';
+        printf("CreateFile failed with %d\n", GetLastError());
+        return 1;
     }
 
-    else
+    LARGE_INTEGER li;
+    if (!GetFileSizeEx(hFile, &li))
     {
-        url = truncate(url, '#');
-    }
-    
-    // 1b. Find ?, extract query, truncate
-    char* query = strchr(url, '?');
-    bool queryIsNull = false;
-
-    if (query == nullptr)
-    {
-        queryIsNull = true;
-        query = new char[1];
-        query[0] = '\0';
+        printf("GetFileSizeEx error %d\n", GetLastError());
+        CloseHandle(hFile);  // Close the handle before returning
+        return 1;
     }
 
-    else
+    size_t fileSize = static_cast<size_t>(li.QuadPart);
+    printf("Opened %s with size %zu\n", filename, fileSize);
+    DWORD bytesRead;
+
+    char* fileBuf = new char[fileSize + 1];  // Added +1 to null-terminate
+
+    if (!ReadFile(hFile, fileBuf, static_cast<DWORD>(fileSize), &bytesRead, NULL) || bytesRead != fileSize)
     {
-        url = truncate(url, '?');
+        printf("ReadFile failed with %d\n", GetLastError());
+        delete[] fileBuf;  // Avoid memory leak
+        CloseHandle(hFile);  // Close the handle before returning
+        return 1;
     }
 
-    // 1c. Find /, extract path, truncate
-    char* path = strchr(url, '/');
-    bool pathIsNull = false;
+    fileBuf[bytesRead] = '\0';  // Null-terminate to work safely with C-string functions
 
-    // If path not present, use root “/” in its place
-    if (path == nullptr)
+    CloseHandle(hFile);
+
+    queue<char*> urlQueue;
+    char* currentStart = fileBuf;
+
+    for (size_t i = 0; i < fileSize; i++)
     {
-        pathIsNull = true;
-        path = new char[2];
-        path[0] = '/';
-        path[1] = '\0';
-    }
-
-    else
-    {
-        url = truncate(url, '/');
-    }
-
-    // 1d. Find :, extract port, truncate, obtain host
-    char* portPos = strchr(url, ':');
-    bool portIsValid = true;
-    bool portIsNull = false;
-
-    if (portPos == nullptr)
-    {
-        portIsNull = true;
-        portPos = new char[3];
-        portPos[0] = '8';
-        portPos[1] = '0';
-        portPos[2] = '\0';
-    }
-
-    else
-    {
-        int port = atoi(portPos + 1);
-        if (port <= 0)
+        if (fileBuf[i] == '\n' || i == fileSize - 1)
         {
-            /*return 1;*/
-            portIsValid = false;
+            size_t endIndex = (i == fileSize - 1 && fileBuf[i] != '\n') ? i : i - 1;
+            size_t urlLength = &fileBuf[endIndex] - currentStart + 1;
+            char* currentURL = new char[urlLength + 1];
+            strncpy_s(currentURL, urlLength + 1, currentStart, urlLength);
+            currentURL[urlLength] = '\0';
+
+            urlQueue.push(currentURL);
+            currentStart = &fileBuf[i + 1];
+        }
+    }
+
+    // Socket Initialization and Connection
+    winsock_test();
+    Socket mySocket;
+    mySocket.openSocket(); // Error handling is included in method
+    set<string> ipSet;
+
+    url currentURL;
+    set<char*, CharStarComparator> hostSet;
+
+    while (!urlQueue.empty())
+    {
+        char* curURL = urlQueue.front();
+        printf("URL: %s\n", curURL);
+
+        currentURL.parseURL(curURL);
+
+        // Check if host is unique using a set
+        auto result = hostSet.insert(currentURL.host);
+
+        if (result.second)
+        {
+            printf("        Checking host uniqueness... passed\n");
+            
+            // DNS lookup
+            char* ipAddr = mySocket.dns(currentURL.host, currentURL.portPos);
+
+            // Check if the IP is unique using the set (similar to your check for hosts)
+            auto result = ipSet.insert(ipAddr);
+
+            if (result.second)  // If IP is unique
+            {
+                printf("        Checking IP uniqueness... passed\n");
+                // Construct HTTP GET request for robots.txt
+                string getRequest = "GET /robots.txt HTTP/1.0\r\nHost: ";
+                getRequest += currentURL.host;  // Add the host name
+                getRequest += "\r\n\r\n";
+
+                // Start the timer
+                clock_t start = clock();
+
+                // Send HTTP GET request
+                if (mySocket.Send(getRequest.c_str(), getRequest.size()))
+                {
+                    // Read HTTP response
+                    if (mySocket.Read())
+                    {
+                        // End the timer
+                        clock_t end = clock();
+
+                        // Calculate time taken and print
+                        double timeTaken = static_cast<double>(end - start) / CLOCKS_PER_SEC * 1000;  // Convert to milliseconds
+                        printf("        Connecting on robots... done in %.0f ms\n", timeTaken);
+
+                        // Check HTTP status code
+                        int statusCode = mySocket.getStatusCode();
+                        if (statusCode == 200)
+                        {
+                            printf("Robots.txt exists for %s\n", currentURL.host);
+                        }
+                        else
+                        {
+                            printf("Robots.txt does not exist for %s, HTTP Status Code: %d\n", currentURL.host, statusCode);
+                        }
+                    }
+                }
+            }
         }
 
         else
         {
-            portPos += 1;
-            url = truncate(url, ':');
+            printf("        Checking host uniqueness... failed\n");
         }
-    }
 
-    if (!portIsValid)
-    {
-        printf("\tParsing URL... failed with invalid port\n");
-        return 0;
-    }
-
-    char* host = url; // Host as leftover from truncated URL
-
-    // Additional Checks
-    if (strlen(host) > MAX_HOST_LEN)
-    {
-        printf("Exceeded max host length %d\n", MAX_HOST_LEN);
-    }
-
-    printf("\tParsing URL... host %s, port %s, request %s%s%s\n", host, portPos, path, query, fragment);
-
-    /*
-         Step 3: DNS (Clock this!)
-            Perform DNS lookup - translates human readable domain names (for example, www.amazon.com) to machine readable IP
-            Handle cases where the DNS lookup fails
-            - 1. Connect but not valid reply
-            - 2. Cannot connect
-    */
-
-    // Removing beginning characters for query fragment and path if not nullptr
-    if (!queryIsNull)
-    {
-        query += 1;
-    }
-
-    if (!fragmentIsNull)
-    {
-        fragment += 1;
-    }
-
-    // Step 4: Socket Initialization and Connection
-    winsock_test();
-
-    // Create socket
-    Socket mySocket;
-    mySocket.openSocket(); // Error handling is included in method
-
-    // Find DNS
-    mySocket.dns(host, portPos); // Calls connect
-
-    // Step 5: HTTP Request Construction
- 
-    // Construct the HTTP request
-    char request[2048];
-    sprintf_s(request, "GET %s%s HTTP/1.0\r\nHost: %s\r\n\r\n", path, (query != nullptr) ? query : "", host);
-
-    // Step 6: Sending and Receiving Data
-
-    // Send the request
-    if (!mySocket.Send(request, static_cast<int>(strlen(request))))
-    {
-        printf("Failed to send request.\n");
-        return 1;
-    }
-
-    // Receive and process data in a loop
-    if (!mySocket.Read())
-    {
-        printf("Failed to receive response.\n");
-        return 1;
-    }
-
-    //Step 7: Parsing HTTP Response
-    bool fullHTMLParse = false;
-    int statusCode = mySocket.getStatusCode(); // Extract status code
-
-    // Status code is null
-    if (statusCode < 0)
-    {
-        printf("ERROR: Buffer is equal to NULL\n");
-        return -1;
-    }
-
-    // Status code is invalid
-    if (statusCode < 100 || statusCode > 599)
-    {
-        printf("ERROR: Invalid status code %i\n", statusCode);
-        return -1;
-    }
-
-    // Positive Status Codes
-    printf("\tVerifying header... status code %i\n", statusCode);
-
-    // Range where we want to parse
-    if ((statusCode >= 200) && (statusCode < 300))
-    {
-        fullHTMLParse = true;
-    }
-
-    // Step 8: Displaying Results
-
-    // Range where we want to skip the HTML parser, but print everything else
-    if (mySocket.validConnection && fullHTMLParse)
-    {
-        // Call html parser
-        char* position = strstr(mySocket.buf, "\r\n\r\n");
-        mySocket.parse(position, mySocket.curPos - atoi(position + 4), originalURL, strlen(originalURL));
-
-        printf("----------------------------------------\n");
-
-        // Print truncated html
-        char* truncated = truncate(mySocket.buf, '<');
-        printf(truncated);
-    }
-
-    else if (mySocket.validConnection && !fullHTMLParse)
-    {
-        printf("----------------------------------------\n");
-        char* truncated = truncate(mySocket.buf, '<');
-        printf(truncated);
-    }
-
-    else
-    {
-        printf("\tConnection Error: %d\n", WSAGetLastError());
-        printf("----------------------------------------\n");
-    }
-
-    // Step 10: Cleanup and Finalization
-    mySocket.Close();
-    mySocket.End();
-
-    // Deallocate dynamic memory
-    if (pathIsNull)
-    {
-        delete[] path;
-    }
-
-    if (portIsNull)
-    {
-        delete[] portPos;
-    }
-
-    if (queryIsNull)
-    {
-        delete[] query;
+        urlQueue.pop();
     }
 
     return 0;

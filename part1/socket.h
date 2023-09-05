@@ -19,7 +19,7 @@ public:
     Socket();
     ~Socket();
     bool Read();
-    void dns(char str[], char* portPos);
+    char* dns(char str[], char* portPos);
     void openSocket();
     void Close();
     void End();
