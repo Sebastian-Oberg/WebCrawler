@@ -166,16 +166,16 @@ char* Socket::dns(char str[], char* portPos, set<string>& ipSet) {
 
     finishConnect = clock();
 
-    // Construct HTTP GET request for robots.txt
-    string getRequest = "GET /robots.txt HTTP/1.0\r\nHost: ";
-    getRequest += str;  // Add the host name
-    getRequest += "\r\n\r\n";
+    // Construct HTTP HEAD request for robots.txt
+    string headRequest = "HEAD /robots.txt HTTP/1.0\r\nHost: ";
+    headRequest += str;  // Add the host name
+    headRequest += "\r\n\r\n";
 
     // Start the timer for fetching robots.txt
     startRobots = clock();
 
-    // Send HTTP GET request
-    if (Send(getRequest.c_str(), getRequest.size()))
+    // Send HTTP HEAD request
+    if (Send(headRequest.c_str(), headRequest.size()))
     {
         // Read HTTP response
         if (Read())
@@ -194,11 +194,15 @@ char* Socket::dns(char str[], char* portPos, set<string>& ipSet) {
             int statusCode = getStatusCode();
             if (statusCode == 200)
             {
-               /* printf("        Robots.txt exists for %s\n", str);*/
+                printf("        TESTING: Robots.txt exists for %s\n", str);
+            }
+            else if (statusCode >= 400 && statusCode < 500)
+            {
+                printf("        TESTING: Robots.txt does not exist for %s, HTTP Status Code: %d\n", str, statusCode);
             }
             else
             {
-                /*printf("        Robots.txt does not exist for %s, HTTP Status Code: %d\n", str, statusCode);*/
+                printf("        TESTING: Preventing further contact with host %s due to HTTP Status Code: %d\n", str, statusCode);
             }
         }
     }
