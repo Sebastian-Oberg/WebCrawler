@@ -87,5 +87,3 @@ In this phase, the program will be extended to download multiple URLs from an in
 - **Performance Profiling:** Conduct performance profiling and analysis to identify bottlenecks and areas for optimization. Use profiling tools to measure execution times and resource utilization.
 
 - **Optimized Algorithm Design:** Evaluate and refine algorithms to achieve better time and space complexity, especially for tasks like DNS lookups, connection establishment, and data retrieval.
-
-By incorporating these enhancements, the web client project can evolve into a more sophisticated and efficient tool for accessing and processing web content. These improvements will contribute to a more seamless and reliable user experience.
